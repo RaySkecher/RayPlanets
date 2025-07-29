@@ -19,3 +19,4 @@ test_raytracer
 .DS_Store
 Thumbs.db
 
+build/
