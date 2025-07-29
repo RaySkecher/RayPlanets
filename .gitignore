@@ -17,3 +17,5 @@ test_raytracer
 # System files
 .DS_Store
 Thumbs.db
+
+*.gif
