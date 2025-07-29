@@ -41,17 +41,6 @@ gcc -std=c99 -Wall -Wextra -O3 -march=native -ffast-math -o raytracer raytracer.
 open output.ppm
 ```
 
-## Output
-
-The raytracer outputs a PPM (Portable Pixmap) image file. PPM is a simple image format that can be viewed by most image viewers and easily converted to other formats:
-
-```bash
-# Convert to PNG (requires ImageMagick)
-convert output.ppm output.png
-
-# Convert to JPEG (requires ImageMagick)
-convert output.ppm output.jpg
-```
 
 
 **Compilation errors**: Ensure you have a C99-compatible compiler and the math library linked (`-lm`).
