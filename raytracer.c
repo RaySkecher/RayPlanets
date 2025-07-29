@@ -9,7 +9,7 @@
 // Path tracing settings
 #define MAX_BOUNCES 3
 #define FOV 60.0
-#define LIGHT_INTENSITY 2.0
+#define LIGHT_INTENSITY 1.0
 #define BRIGHTNESS_SHIFT 4
 #define NUM_SAMPLES 16
 
@@ -135,9 +135,9 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
 };
 
 static const Sphere g_spheres[NUM_SPHERES] = {
-    {.center = {.x = F(0.5), .y = F(0.5), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
+    {.center = {.x = F(0.7), .y = F(0.5), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
     {.center = {.x = F(0.0), .y = F(0.5), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Small grey sphere
-    {.center = {.x = F(-0.6), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
+    {.center = {.x = F(-0.8), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
    
 };
 
@@ -234,35 +234,24 @@ Vec3 vec_norm(Vec3 v) {
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
     int32_t dists[NUM_SPHERES];
+    Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1};
 
-  LOOP_I:
+    // Compute intersection distances for all spheres
     for (size_t i = 0; i < NUM_SPHERES; ++i) {
-    #pragma HLS pipeline off
-    int32_t t = intersect_sphere(r, g_spheres[i]);
-    dists[i] = t;
-}
-    Intersection result;
-    result.t = FP_INF;
-    result.hit_index = -1;
-    result.hit = 0;
+        dists[i] = intersect_sphere(r, g_spheres[i]);
+    }
 
-    LOOP_K:
+    // Find the closest intersection
     for (size_t k = 0; k < NUM_SPHERES; ++k) {
-        #pragma HLS pipeline off
         if (dists[k] < result.t) {
             result.t = dists[k];
-            if (k < NUM_SPHERES) {          // correct test
-            
-                result.hit_index = k;
-            } else {
-                
-                result.hit_index = k - NUM_SPHERES;
-            }
+            result.hit_index = k;
+            result.hit = 1;  
         }
-    } 
+    }
+
     return result;
 }
-
 // Ray-sphere intersection
 int32_t intersect_sphere(Ray r, Sphere s) {
     //#pragma HLS ALLOCATION function instances=mul limit=2
@@ -337,46 +326,49 @@ Color trace_path(int16_t x, int16_t y) {
 
             Material surface_mat = mat;
             if (mat.is_light) { // If we hit the ceiling plane
-                if (b == 0) {
-                    path_color = vec_add(path_color, mat.color);
-                }
+                path_color = vec_add(path_color, vec_mul(path_attenuation, mat.color));
                 path_attenuation = (Vec3){F(0), F(0), F(0)};
+                break;
             }
 
             // Check if it is in a shadow
-            int32_t rand1 = rand_fp(); // 0…ONE
-            int32_t rand2 = rand_fp();
-            Vec3 light_point = vec_add((Vec3){F(0.0), F(0.5), F(-0.4)}, vec_scale(random_unit_vector(), F(0.7)));
+            // Shadow ray to the light source (sphere 2)
+            Vec3 light_center = g_spheres[1].center; // Assuming sphere 2 is the light
+            Vec3 light_point = vec_add(light_center, vec_scale(random_unit_vector(), g_spheres[1].radius));
             Vec3 light_vec = vec_sub(light_point, hit_point);
             int32_t dist_sq = vec_len_sq(light_vec);
             Vec3 light_dir = vec_norm(light_vec);
 
+            
             Ray shadow_ray = {vec_add(hit_point, vec_scale(hit_normal, F(0.01))), light_dir};
             int occluded = 0;
             for (size_t i = 0; i < NUM_SPHERES; ++i) {
-                #pragma HLS pipeline off
+                if (i == hit_object_index || i == 1) continue; // Skip the hit object and light source
                 int32_t shadow_t = intersect_sphere(shadow_ray, g_spheres[i]);
-                if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) { occluded = (i != 0); }
+                if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) {
+                    occluded = 1;
+                    break;
+                }
             }
 
             if (!occluded) {
                 // if it is NOT in a shadow, calculate the direct light contribution
                 int32_t cos_theta = vec_dot(hit_normal, light_dir);
-                Vec3 light_normal = light_dir;
+                Vec3 light_normal = vec_norm(vec_sub(light_point, light_center));;
                 int32_t cos_alpha = vec_dot(light_normal, light_dir);
 
                 if (cos_theta > 0 && cos_alpha > 0) { // if the light and surface are facing each other
                     Material light_mat = g_spheres[1].material;
-                    int32_t light_area = F(2.0 * 0.4);
+                    int32_t light_area = mul(g_spheres[1].radius, g_spheres[1].radius); // Approximate light area
                     int32_t geom_term_num = mul(cos_theta, cos_alpha);
                     int32_t geom_term = div_fp(geom_term_num, dist_sq);
 
-                    Vec3 direct_light = vec_mul(path_attenuation, surface_mat.color);
+                    Vec3 direct_light = vec_mul(path_attenuation, mat.color);
                     direct_light = vec_mul(direct_light, light_mat.color);
                     direct_light = vec_scale(direct_light, geom_term);
                     direct_light = vec_scale(direct_light, light_area);
                     // Divide by PI for diffuse BRDF
-                    direct_light = vec_scale(direct_light, F(0.3183)); 
+                    direct_light = vec_scale(direct_light, F(0.8)); 
                     path_color = vec_add(path_color, direct_light);
                 }
             }
@@ -397,9 +389,4 @@ Color trace_path(int16_t x, int16_t y) {
     }
 
     return (Color){fp_to_u8((fp_t)(acc_r / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_g / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_b / NUM_SAMPLES))};
-}
-
-// Check if a point is on the rectangular light source on the ceiling
-int is_on_light(Vec3 p) {
-    return (p.x >= F(-1.0) && p.x <= F(1.0) && p.z >= F(-3.2) && p.z <= F(-2.8));
 }
