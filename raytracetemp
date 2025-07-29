@@ -270,14 +270,6 @@ Vec3 vec_norm(Vec3 v) {
     return vec_scale(v, inv_len);
 }
 
-// Vector cross product
-Vec3 vec_cross(Vec3 a, Vec3 b) {
-    return (Vec3){
-        (fp_t)(mul(a.y, b.z) - mul(a.z, b.y)),
-        (fp_t)(mul(a.z, b.x) - mul(a.x, b.z)),
-        (fp_t)(mul(a.x, b.y) - mul(a.y, b.x))
-    };
-}
 
 
 // Rotation matrix operations for orbital motion
@@ -401,67 +393,36 @@ int32_t intersect_sphere(Ray r, Sphere s) {
     return FP_INF;
 }
 
-// Ray-ring intersection
 int32_t intersect_ring(Ray r, Ring ring) {
     int32_t denom = vec_dot(ring.normal, r.dir);
-    if (denom > -FP_EPS && denom < FP_EPS) return FP_INF; // Ray is parallel to plane
+    if (denom > -FP_EPS && denom < FP_EPS) return FP_INF;
 
     int32_t t = div_fp(vec_dot(ring.normal, vec_sub(ring.center, r.orig)), denom);
-    if (t <= FP_EPS) return FP_INF; // Intersection behind or too close
+    if (t <= FP_EPS) return FP_INF;
 
     Vec3 hit_point = vec_add(r.orig, vec_scale(r.dir, t));
-    Vec3 d = vec_sub(hit_point, ring.center); // Vector from ring center to hit point
+    Vec3 d = vec_sub(hit_point, ring.center);
+    // Elliptical ring check (assume ellipse lies in XZ-plane)
+    int32_t x = d.x;
+    int32_t z = d.z;
 
-    // Project d onto the ring's plane
-    int32_t dot_d_normal = vec_dot(d, ring.normal);
-    Vec3 d_proj = vec_sub(d, vec_scale(ring.normal, dot_d_normal));
+    int32_t a = ring.outer_radius;
+    int32_t b = mul(a, ring.ellipse_ratio);  // semi-minor axis
 
-    // Calculate squared distance from center in the plane
-    int32_t dist_sq_in_plane = vec_len_sq(d_proj);
+    int32_t x_term = div_fp(mul(x, x), mul(a, a));
+    int32_t z_term = div_fp(mul(z, z), mul(b, b));
+    int32_t ellipse_outer = x_term + z_term;
 
-    // Check circular bounds first (simpler, faster check)
-    int32_t inner_radius_sq = mul(ring.inner_radius, ring.inner_radius);
-    int32_t outer_radius_sq = mul(ring.outer_radius, ring.outer_radius);
+    int32_t a_inner = ring.inner_radius;
+    int32_t b_inner = mul(a_inner, ring.ellipse_ratio);
 
-    if (dist_sq_in_plane < inner_radius_sq || dist_sq_in_plane > outer_radius_sq) {
-        return FP_INF; // Outside circular bounds
-    }
+    int32_t x_term_inner = div_fp(mul(x, x), mul(a_inner, a_inner));
+    int32_t z_term_inner = div_fp(mul(z, z), mul(b_inner, b_inner));
+    int32_t ellipse_inner = x_term_inner + z_term_inner;
 
-    // If it's an ellipse (ellipse_ratio != ONE), perform elliptical check
-    if (ring.ellipse_ratio != ONE) {
-        // Define local orthonormal axes for the ellipse in its plane
-        Vec3 u_axis;
-        Vec3 temp_vec = {F(0), F(1), F(0)}; // Reference vector (Y-axis)
-        // If ring.normal is parallel to Y-axis, use X-axis as reference
-        if (vec_len_sq(vec_cross(ring.normal, temp_vec)) < FP_EPS) {
-            temp_vec = (Vec3){F(1), F(0), F(0)};
-        }
-        u_axis = vec_norm(vec_cross(ring.normal, temp_vec)); // Major axis direction
-        Vec3 v_axis = vec_norm(vec_cross(ring.normal, u_axis)); // Minor axis direction
+    if (ellipse_outer > ONE || ellipse_inner < ONE) return FP_INF;
 
-        // Get local coordinates u and v
-        int32_t u = vec_dot(d_proj, u_axis);
-        int32_t v = vec_dot(d_proj, v_axis);
-
-        // Elliptical check
-        int32_t a_outer = ring.outer_radius;
-        int32_t b_outer = mul(a_outer, ring.ellipse_ratio);
-        int32_t u_term_outer = div_fp(mul(u, u), mul(a_outer, a_outer));
-        int32_t v_term_outer = div_fp(mul(v, v), mul(b_outer, b_outer));
-        int32_t ellipse_outer_check = u_term_outer + v_term_outer;
-
-        int32_t a_inner = ring.inner_radius;
-        int32_t b_inner = mul(a_inner, ring.ellipse_ratio);
-        int32_t u_term_inner = div_fp(mul(u, u), mul(a_inner, a_inner));
-        int32_t v_term_inner = div_fp(mul(v, v), mul(b_inner, b_inner));
-        int32_t ellipse_inner_check = u_term_inner + v_term_inner;
-
-        if (ellipse_outer_check > ONE || ellipse_inner_check < ONE) {
-            return FP_INF; // Outside elliptical bounds
-        }
-    }
-
-    return t; // Hit the ring
+    return t;
 }
 
 
