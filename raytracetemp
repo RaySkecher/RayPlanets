@@ -633,11 +633,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1) {
         animation_time = atof(argv[1]);
     }
-    
-    setup_rings();
 
     // Update planet positions for current animation time
     update_planet_positions(animation_time);
+    setup_rings();
     update_ring_positions();
 
     // Create PPM image header
