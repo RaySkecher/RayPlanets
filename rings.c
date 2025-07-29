@@ -1,5 +1,13 @@
 #define NUM_RINGS 5
 
+// (add hit_type) Structure to hold intersection results
+typedef struct {
+    int32_t t;            // keep 32-bit for extra head-room during comparisons
+    int hit_index;
+    int hit_type;        // 0 = sphere, 1 = ring
+    int hit;      // 1 if an object was hit, 0 otherwise
+} Intersection;
+
 //ring
 typedef struct {
     Vec3 center;
@@ -12,22 +20,28 @@ typedef struct {
 
 Ring g_rings[NUM_RINGS];
 
+void update_ring_positions() {
+    for (int i = 0; i < NUM_RINGS; ++i)
+        g_rings[i].center = g_spheres[2].center;
+}
+
 void setup_rings() {
-    Vec3 jupiter_center = (Vec3){F(2), F(0), F(-1)};  // Position of Jupiter
+    Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
 
     // Manually customized ring sizes and colors
-   fp_t inner_radii[NUM_RINGS]     = {F(0.4), F(0.65)};
-    fp_t outer_radii[NUM_RINGS]     = {F(0.6), F(0.85)};
-    fp_t ellipse_ratios[NUM_RINGS]  = {F(0.7), F(0.7)};  // Elliptical shape
+    fp_t inner_radii[NUM_RINGS] = {F(0.2), F(0.3)};
+    fp_t outer_radii[NUM_RINGS] = {F(0.25), F(0.35)};
+    fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
     Vec3 colors[NUM_RINGS] = {
-        {F(0.9), F(0.5), F(0.1)},   // Inner: rusty orange
-        {F(0.8), F(0.8), F(0.5)}    // Outer: pale yellow
+        {F(0.4), F(0.4), F(0.5)},
+        {F(0.2), F(0.2), F(0.3)}
     };
+
     for (int i = 0; i < NUM_RINGS; ++i) {
          g_rings[i].center = jupiter_center;
 
         // All rings lie in roughly the same flat orbital plane
-        g_rings[i].normal = vec_norm((Vec3){F(0.05), F(1), F(0.02)});
+        g_rings[i].normal = vec_norm((Vec3){F(0.1), F(1), F(0.1)});
 
         g_rings[i].inner_radius = inner_radii[i];
         g_rings[i].outer_radius = outer_radii[i];
@@ -85,3 +99,6 @@ int32_t intersect_ring(Ray r, Ring ring) {
 
 //call setup_rings in main():
     setup_rings();
+
+//update ting position after update_planet_positions(animation_time);
+ update_ring_positions();
