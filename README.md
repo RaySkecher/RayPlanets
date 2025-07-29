@@ -3,27 +3,12 @@
 ### One-command build and run (recommended)
 
 ```bash
-make run
+make
 ```
 
 ### Step-by-step commands
 
 ```bash
-# Test compilation
-make test
-
-# Build the raytracer
-make
-
-# Render the image
-make render
-
-# View the rendered image
-make view
-
-# Convert to PNG (requires ImageMagick)
-make png
-
 # Clean build artifacts
 make clean
 ```
