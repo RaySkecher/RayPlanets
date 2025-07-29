@@ -7,6 +7,7 @@ test_raytracer
 *.png
 *.jpg
 *.jpeg
+*.gif
 
 # Editor files
 .vscode/
@@ -18,4 +19,3 @@ test_raytracer
 .DS_Store
 Thumbs.db
 
-*.gif

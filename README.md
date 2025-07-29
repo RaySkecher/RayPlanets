@@ -1,31 +1,7 @@
-# RayPlanets Raytracer
+# RayPlanets
 
-### One-command build and run (recommended)
+Raytracer that renders planets orbiting a sun using fixed-point math.
 
-```bash
-make
-```
-
-### Step-by-step commands
-
-```bash
-# Clean build artifacts
-make clean
-```
-
-### Manual compilation
-
-```bash
-# Compile
-gcc -std=c99 -Wall -Wextra -O3 -march=native -ffast-math -o raytracer raytracer.c -lm
-
-# Render
-./raytracer <time> > output.ppm
-
-# View (macOS)
-open output.ppm
-```
-
-
-
-
+Run `make` to generate 3 frames showing orbital motion.
+Run `make gif` to create an animated GIF.
+Run `make clean` to remove all generated files.

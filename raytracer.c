@@ -40,7 +40,7 @@ typedef int16_t fp_t;
 #define FP_EPS ((fp_t)1)             // ≈ 0.00024 in real units
 #define FP_INF 0x7FFFFFFF            // Large “infinite” distance sentinel
 
-// Simple vector struct
+// Simple vector structhr
 typedef struct {
     fp_t x, y, z;
 } Vec3;
