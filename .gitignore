@@ -1,0 +1,19 @@
+# Build artifacts
+raytracer
+test_raytracer
+
+# Output images
+*.ppm
+*.png
+*.jpg
+*.jpeg
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db

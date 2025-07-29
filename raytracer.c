@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 
 #ifndef M_PI
@@ -8,10 +9,17 @@
 
 // Path tracing settings
 #define MAX_BOUNCES 3
-#define FOV 60.0
+#define FOV 70.0
 #define LIGHT_INTENSITY 1.0
 #define BRIGHTNESS_SHIFT 4
 #define NUM_SAMPLES 16
+
+// Animation settings
+#define ANIMATION_TIME 0.0f  // Current time (can be modified for different frames)
+#define PLANET1_ORBIT_RADIUS 2.5f
+#define PLANET1_ORBIT_SPEED 1.0f
+#define PLANET2_ORBIT_RADIUS 1.6f  
+#define PLANET2_ORBIT_SPEED 0.6f
 
 // Scene dimensions
 #define NUM_SPHERES 3
@@ -134,10 +142,10 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
     {.x = 110, .y = 180, .z = 210}, {.x = -110, .y = -180, .z = -210}
 };
 
-static const Sphere g_spheres[NUM_SPHERES] = {
-    {.center = {.x = F(0.7), .y = F(0.5), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
-    {.center = {.x = F(0.0), .y = F(0.5), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Small grey sphere
-    {.center = {.x = F(-0.8), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.2), .material = {.color = {.x = F(1.0), .y = F(0.7), .z = F(0.2)}, .is_light = 0}}, // Large yellow sphere
+static Sphere g_spheres[NUM_SPHERES] = {
+    {.center = {.x = F(0.7), .y = F(0.5), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
+    {.center = {.x = F(0.0), .y = F(0.5), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
+    {.center = {.x = F(-0.8), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
    
 };
 
@@ -231,6 +239,37 @@ Vec3 vec_norm(Vec3 v) {
     return vec_scale(v, inv_len);
 }
 
+// Rotation matrix operations for orbital motion
+Vec3 rotate_y(Vec3 v, float angle) {
+    float cos_a = cosf(angle);
+    float sin_a = sinf(angle);
+    
+    return (Vec3){
+        F(cos_a * I(v.x) + sin_a * I(v.z)),
+        v.y,
+        F(-sin_a * I(v.x) + cos_a * I(v.z))
+    };
+}
+
+// Calculate orbital position for a planet
+Vec3 get_orbital_position(Vec3 sun_center, float orbit_radius, float orbit_speed, float time) {
+    float angle = orbit_speed * time;
+    Vec3 offset = {F(orbit_radius), F(0), F(0)};
+    Vec3 rotated_offset = rotate_y(offset, angle);
+    return vec_add(sun_center, rotated_offset);
+}
+
+// Update planet positions based on current time
+void update_planet_positions(float time) {
+    Vec3 sun_pos = g_spheres[1].center; // Sun is at index 1
+    
+    // Update Planet 1 (index 0)
+    g_spheres[0].center = get_orbital_position(sun_pos, PLANET1_ORBIT_RADIUS, PLANET1_ORBIT_SPEED, time);
+    
+    // Update Planet 2 (index 2) 
+    g_spheres[2].center = get_orbital_position(sun_pos, PLANET2_ORBIT_RADIUS, PLANET2_ORBIT_SPEED, time);
+}
+
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
     int32_t dists[NUM_SPHERES];
@@ -285,7 +324,7 @@ Color trace_path(int16_t x, int16_t y) {
     //#pragma HLS ALLOCATION function instances=intersect_sphere limit=1
     #pragma HLS bind_storage variable=g_unit_vector_lut type=rom_1p
 
-    Ray cam = {{F(0), F(0.8), F(2)}, {F(0), F(0), F(-1)}};
+    Ray cam = {{F(0), F(1.2), F(3)}, {F(0), F(0), F(-1)}};
     float fov_rad = FOV * M_PI / 180.0;
     float fov_scale = tan(fov_rad / 2.0);
     //float aspect_ratio = (float)WIDTH / HEIGHT;
@@ -389,4 +428,37 @@ Color trace_path(int16_t x, int16_t y) {
     }
 
     return (Color){fp_to_u8((fp_t)(acc_r / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_g / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_b / NUM_SAMPLES))};
+}
+
+int main(int argc, char *argv[]) {
+    // Parse animation time from command line (default to 0.0)
+    float animation_time = ANIMATION_TIME;
+    if (argc > 1) {
+        animation_time = atof(argv[1]);
+    }
+    
+    // Update planet positions for current animation time
+    update_planet_positions(animation_time);
+    
+    // Create PPM image header
+    printf("P3\n");
+    printf("%d %d\n", WIDTH, HEIGHT);
+    printf("255\n");
+    
+    // Render each pixel
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            Color pixel = trace_path(x, y);
+            printf("%d %d %d ", pixel.r, pixel.g, pixel.b);
+        }
+        printf("\n");
+        
+        // Progress indicator to stderr
+        if (y % 32 == 0) {
+            fprintf(stderr, "Progress: %.1f%%\n", (float)y / HEIGHT * 100.0);
+        }
+    }
+    
+    fprintf(stderr, "Rendering complete!\n");
+    return 0;
 }
