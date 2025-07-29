@@ -43,8 +43,4 @@ open output.ppm
 
 
 
-**Compilation errors**: Ensure you have a C99-compatible compiler and the math library linked (`-lm`).
 
-## License
-
-Open source - feel free to modify and experiment with the code!
