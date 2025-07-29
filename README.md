@@ -20,7 +20,7 @@ make clean
 gcc -std=c99 -Wall -Wextra -O3 -march=native -ffast-math -o raytracer raytracer.c -lm
 
 # Render
-./raytracer > output.ppm
+./raytracer <time> > output.ppm
 
 # View (macOS)
 open output.ppm
