@@ -465,8 +465,6 @@ Color trace_path(int16_t x, int16_t y) {
             Intersection inter = intersect_scene(r);
 
             if (!inter.hit) {
-                // deep_purple_blue: now approximates ~RGB(40, 20, 100)
-                // light_purple_blue: now approximates ~RGB(100, 80, 200)
                 //Both values adjusted for BRIGHTNESS_SHIFT
                 Vec3 deep_purple_blue = {F(0.039 / 16.0), F(0.039 / 16.0), F(0.098/ 16.0)}; 
                 Vec3 light_purple_blue = {F(0.071 / 16.0), F(0.118 / 16.0), F(0.294 / 16.0)};
