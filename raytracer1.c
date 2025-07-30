@@ -9,7 +9,7 @@
 
 // Path tracing settings
 #define MAX_BOUNCES 3
-#define FOV 70.0
+#define FOV 75.0
 #define LIGHT_INTENSITY 1.0
 #define BRIGHTNESS_SHIFT 4
 #define NUM_SAMPLES 16
@@ -17,7 +17,7 @@
 // Animation settings
 #define ANIMATION_TIME 0.0f  // Current time (can be modified for different frames)
 #define PLANET1_ORBIT_RADIUS 2.5f
-#define PLANET1_ORBIT_SPEED 1.0f
+#define PLANET1_ORBIT_SPEED 1.3f
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
 
@@ -155,7 +155,7 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
     {.x = 110, .y = 180, .z = 210}, {.x = -110, .y = -180, .z = -210}
 };
 
-static Ray camera = {.orig = {.x = F(0), .y = F(1.2),.z = F(3)}, .dir = {.x = F(0), .y = F(0), .z = F(-1)}};
+static Ray camera = {.orig = {.x = F(0), .y = F(2),.z = F(1)}, .dir = {.x = F(0), .y = F(0), .z = F(-1)}};
 
 static Sphere g_spheres[NUM_SPHERES] = {
     {.center = {.x = F(0.7), .y = F(0.75), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
@@ -358,9 +358,9 @@ void update_camera_orbit(float angle) {
     Vec3 sun_pos = g_spheres[1].center;
 
     // Orbit camera around Y-axis at fixed radius
-    float x = CAMERA_ORBIT_RADIUS * sinf(angle);
-    float z = CAMERA_ORBIT_RADIUS * cosf(angle);
-    camera.orig = (Vec3){F(x), F(1.2), F(z)};  // Keep eye level fixed
+    // float x = CAMERA_ORBIT_RADIUS * sinf(angle);
+    // float z = CAMERA_ORBIT_RADIUS * cosf(angle);
+    // camera.orig = (Vec3){F(x), F(3), F(z)};  // Keep eye level fixed
 
     // Point toward the sun
     Vec3 to_sun = vec_sub(sun_pos, camera.orig);
@@ -494,8 +494,8 @@ Color trace_path(int16_t x, int16_t y) {
         Vec3 up = (Vec3){F(0), F(1), F(0)};
         Vec3 right = vec_norm((Vec3){forward.z, F(0), -forward.x});  
 
-        float sx = sx_ndc * fov_scale * aspect_ratio;
-        float sy = sy_ndc * fov_scale;
+        float sx = fov_scale * sx_ndc;
+        float sy = fov_scale * sy_ndc;
 
         Vec3 dir = vec_add(
         vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
