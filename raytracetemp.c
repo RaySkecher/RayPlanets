@@ -912,6 +912,7 @@ int main(int argc, char *argv[]) {
     update_planet_positions(animation_time);
     setup_rings();
     update_ring_positions();
+    update_camera_position(SCANCODE, animation_time);
 
     // Create PPM image header
     printf("P3\n");
