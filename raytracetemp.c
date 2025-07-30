@@ -314,12 +314,13 @@ void setup_rings() {
     Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
     Vec3 orange_center = g_spheres[0].center;
     // Manually customized ring sizes and colors
-    fp_t inner_radii[NUM_RINGS] = {F(0.25), F(0.35), F(0.35)};  // > planet radius (0.15)
-    fp_t outer_radii[NUM_RINGS] = {F(0.3), F(0.4), F(0.5)};
+    fp_t inner_radii[NUM_RINGS] = {F(0.25), F(0.35), F(0.3), F(0.4)};  // > planet radius (0.15)
+    fp_t outer_radii[NUM_RINGS] = {F(0.3), F(0.4), F(0.38),F(0.45)};
     //fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
     Vec3 colors[NUM_RINGS] = {
         {F(0.4), F(0.4), F(0.5)},
         {F(0.2), F(0.2), F(0.3)},
+        {F(0.15), F(0.08), F(0.05)},
         {F(0.5), F(0.3), F(0.1)},
     };
 
