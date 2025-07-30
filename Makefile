@@ -23,7 +23,7 @@ $(TARGET): $(SOURCE)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE) -lm
 
 gif: all
-	@magick -delay $(GIF_DELAY) build/frame*.ppm -loop 0 build/animation.gif
+	@convert -delay $(GIF_DELAY) build/frame*.ppm -loop 0 build/animation.gif
 	@if command -v open >/dev/null 2>&1; then \
 		open build/animation.gif; \
 	elif command -v xdg-open >/dev/null 2>&1; then \
