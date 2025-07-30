@@ -23,8 +23,7 @@
 
 // Scene dimensions
 #define NUM_SPHERES 3
-#define NUM_PLANES 0
-#define NUM_RINGS 5
+#define NUM_RINGS 2
 
 #define HEIGHT 256
 #define WIDTH 256
@@ -76,7 +75,7 @@ typedef struct {
     int hit;      // 1 if an object was hit, 0 otherwise
 } Intersection;
 
-//ring
+//Ring
 typedef struct {
     Vec3 center;
     Vec3 normal;
@@ -155,9 +154,9 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
 };
 
 static Sphere g_spheres[NUM_SPHERES] = {
-    {.center = {.x = F(0.7), .y = F(0.5), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
-    {.center = {.x = F(0.0), .y = F(0.5), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
-    {.center = {.x = F(-0.8), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
+    {.center = {.x = F(0.7), .y = F(0.75), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
+    {.center = {.x = F(0.0), .y = F(0.75), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
+    {.center = {.x = F(-0.8), .y = F(0.75), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
    
 };
 
@@ -229,12 +228,30 @@ Vec3 random_unit_vector() {
                    (fp_t)(base.z << (FRAC_BITS - 8)) };
 }
 
+// Simple hash function for Vec3 to create deterministic stars
+static uint32_t hash_vec3(Vec3 v) {
+    uint32_t h = (uint32_t)v.x;
+    h = (h * 73856093) ^ ((uint32_t)v.y * 19349663);
+    h = (h * 83492791) ^ ((uint32_t)v.z * 101390427);
+    return h;
+}
+
+// Function to get a deterministic pseudo-random fixed-point number from a seed [0, ONE)
+static fp_t get_deterministic_rand_fp(uint32_t seed) {
+    uint32_t s = seed;
+    s ^= s << 13;
+    s ^= s >> 17;
+    s ^= s << 5;
+    // Take the most significant FRAC_BITS for the fractional part.
+    // This effectively scales the 32-bit random number to the [0, ONE) fixed-point range.
+    return (fp_t)(s >> (32 - FRAC_BITS));
+}
+
 // Forward declarations
 int is_on_light(Vec3 p);
 int32_t intersect_sphere(Ray r, Sphere s);
 Intersection intersect_scene(Ray r);
 int32_t intersect_ring(Ray r, Ring ring);
-
 
 
 // Vector operations
@@ -252,6 +269,8 @@ Vec3 vec_norm(Vec3 v) {
     int32_t inv_len = inv_sqrt_fp(len_sq);
     return vec_scale(v, inv_len);
 }
+
+
 
 // Rotation matrix operations for orbital motion
 Vec3 rotate_y(Vec3 v, float angle) {
@@ -282,7 +301,6 @@ void update_planet_positions(float time) {
     
     // Update Planet 2 (index 2) 
     g_spheres[2].center = get_orbital_position(sun_pos, PLANET2_ORBIT_RADIUS, PLANET2_ORBIT_SPEED, time);
-
 }
 
 Ring g_rings[NUM_RINGS];
@@ -296,7 +314,7 @@ void setup_rings() {
     Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
 
     // Manually customized ring sizes and colors
-    fp_t inner_radii[NUM_RINGS] = {F(0.2), F(0.3)};
+    fp_t inner_radii[NUM_RINGS] = {F(0.2), F(0.3)};  // > planet radius (0.15)
     fp_t outer_radii[NUM_RINGS] = {F(0.25), F(0.35)};
     fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
     Vec3 colors[NUM_RINGS] = {
@@ -320,7 +338,6 @@ void setup_rings() {
         };
     }
 }
-
 
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
@@ -353,7 +370,6 @@ Intersection intersect_scene(Ray r) {
 
     return result;
 }
-
 // Ray-sphere intersection
 int32_t intersect_sphere(Ray r, Sphere s) {
     //#pragma HLS ALLOCATION function instances=mul limit=2
@@ -377,7 +393,6 @@ int32_t intersect_sphere(Ray r, Sphere s) {
     return FP_INF;
 }
 
-// Ray-ring intersection
 int32_t intersect_ring(Ray r, Ring ring) {
     int32_t denom = vec_dot(ring.normal, r.dir);
     if (denom > -FP_EPS && denom < FP_EPS) return FP_INF;
@@ -409,6 +424,7 @@ int32_t intersect_ring(Ray r, Ring ring) {
 
     return t;
 }
+
 
 Color trace_path(int16_t x, int16_t y) {
     //#pragma HLS ALLOCATION function instances=mul limit=32
@@ -442,8 +458,50 @@ Color trace_path(int16_t x, int16_t y) {
             Intersection inter = intersect_scene(r);
 
             if (!inter.hit) {
-                path_attenuation = (Vec3){F(0), F(0), F(0)};
-                break;
+                // deep_purple_blue: now approximates ~RGB(40, 20, 100)
+                // light_purple_blue: now approximates ~RGB(100, 80, 200)
+                //Both values adjusted for BRIGHTNESS_SHIFT
+                Vec3 deep_purple_blue = {F(0.0098), F(0.0049), F(0.0245)}; 
+                Vec3 light_purple_blue = {F(0.0245), F(0.0196), F(0.049)};
+
+                // Get interpolation factor based on ray's Y-direction (vertical position)
+                // Map r.dir.y from [-ONE, ONE] to [0, ONE]
+                // r.dir.y is in fixed-point, range approx [-1.0, 1.0]
+                // To map to [0.0, 1.0], we do (r.dir.y + 1.0) / 2.0
+                fp_t interp_factor_y = div_fp(r.dir.y + ONE, F(2.0));
+
+                // Clamp interpolation factor to ensure it's within [0, ONE]
+                if (interp_factor_y < 0) interp_factor_y = 0;
+                if (interp_factor_y > ONE) interp_factor_y = ONE;
+
+                Vec3 base_sky_color;
+                base_sky_color.x = deep_purple_blue.x + mul(light_purple_blue.x - deep_purple_blue.x, interp_factor_y);
+                base_sky_color.y = deep_purple_blue.y + mul(light_purple_blue.y - deep_purple_blue.y, interp_factor_y);
+                base_sky_color.z = deep_purple_blue.z + mul(light_purple_blue.z - deep_purple_blue.z, interp_factor_y);
+
+                Vec3 sky_color = base_sky_color; // Start with the interpolated color
+
+                // Add stars based on ray direction (deterministic)
+                uint32_t star_seed = hash_vec3(r.dir);
+                fp_t star_prob = get_deterministic_rand_fp(star_seed);
+
+                // Adjust this threshold for star density (smaller value = fewer stars)
+                fp_t star_threshold = F(0.0003f); // Fixed-point threshold
+
+                if (star_prob < star_threshold) {
+                    fp_t intensity_factor = div_fp(star_prob, star_threshold);
+                    fp_t one_minus_factor = ONE - intensity_factor;
+                    fp_t star_intensity_fp = F(0.5) + mul(one_minus_factor, F(0.5));
+
+                    // Add star intensity to the interpolated sky color
+                    sky_color.x = sky_color.x + star_intensity_fp;
+                    sky_color.y = sky_color.y + star_intensity_fp;
+                    sky_color.z = sky_color.z + star_intensity_fp;
+                }
+
+                path_color = vec_add(path_color, vec_mul(path_attenuation, sky_color));
+                path_attenuation = (Vec3){F(0), F(0), F(0)}; // Stop path tracing
+                break; // Path ends in sky
             }
 
             int32_t t = inter.t;
@@ -453,14 +511,18 @@ Color trace_path(int16_t x, int16_t y) {
             Vec3 hit_normal;
             Material mat;
 
-            if (inter.hit_type == 0) { // Sphere
+           if (inter.hit_type == 0) { // Sphere
                 mat = g_spheres[hit_object_index].material;
                 hit_normal = vec_norm(vec_sub(hit_point, g_spheres[hit_object_index].center));
             } else if (inter.hit_type == 1) { // Ring
                 mat = g_rings[hit_object_index].material;
                 hit_normal = g_rings[hit_object_index].normal;
+                if (vec_dot(hit_normal, r.dir) > 0) {
+                    hit_normal.x = -hit_normal.x;
+                    hit_normal.y = -hit_normal.y;
+                    hit_normal.z = -hit_normal.z;
+                }
             }
-
 
             Material surface_mat = mat;
             if (mat.is_light) { // If we hit the ceiling plane
@@ -483,6 +545,15 @@ Color trace_path(int16_t x, int16_t y) {
             for (size_t i = 0; i < NUM_SPHERES; ++i) {
                 if (i == hit_object_index || i == 1) continue; // Skip the hit object and light source
                 int32_t shadow_t = intersect_sphere(shadow_ray, g_spheres[i]);
+                if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) {
+                    occluded = 1;
+                    break;
+                }
+            }
+
+            for (size_t i = 0; i < NUM_RINGS; ++i) {
+                if (i == hit_object_index) continue; // Skip the hit ring
+                int32_t shadow_t = intersect_ring(shadow_ray, g_rings[i]);
                 if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) {
                     occluded = 1;
                     break;
@@ -529,23 +600,48 @@ Color trace_path(int16_t x, int16_t y) {
     return (Color){fp_to_u8((fp_t)(acc_r / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_g / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_b / NUM_SAMPLES))};
 }
 
+// New top-level function for Vitis HLS
+void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
+    // HLS INTERFACE pragmas define how arguments map to hardware ports
+    #pragma HLS INTERFACE s_axilite port=animation_time bundle=control
+    #pragma HLS INTERFACE m_axi port=output_buffer offset=slave bundle=gmem
+    #pragma HLS INTERFACE s_axilite port=return bundle=control
+
+    // Initialize ring properties once per frame (or once if animation_time is fixed)
+    setup_rings(); 
+
+    // Update planet and ring positions for current animation time
+    update_planet_positions(animation_time);
+    update_ring_positions(); 
+    
+    // Render each pixel
+    #pragma HLS DATAFLOW
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            #pragma HLS pipeline II=1
+            output_buffer[y][x] = trace_path(x, y);
+        }
+    }
+}
+
+//COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
+
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
     if (argc > 1) {
         animation_time = atof(argv[1]);
     }
-    
+
     // Update planet positions for current animation time
     update_planet_positions(animation_time);
-    update_ring_positions();
-    
     setup_rings();
+    update_ring_positions();
 
     // Create PPM image header
     printf("P3\n");
     printf("%d %d\n", WIDTH, HEIGHT);
-    printf("255\n");
+    printf("255\n"); 
     
     // Render each pixel
     for (int y = 0; y < HEIGHT; y++) {
@@ -553,6 +649,14 @@ int main(int argc, char *argv[]) {
             Color pixel = trace_path(x, y);
             printf("%d %d %d ", pixel.r, pixel.g, pixel.b);
         }
+        printf("\n");
+        
+        // Progress indicator to stderr
+        if (y % 32 == 0) {
+            fprintf(stderr, "Progress: %.1f%%\n", (float)y / HEIGHT * 100.0);
+        }
     }
+    
+    fprintf(stderr, "Rendering complete!\n");
     return 0;
-}
+} 
