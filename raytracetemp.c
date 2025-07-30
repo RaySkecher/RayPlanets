@@ -419,7 +419,7 @@ void update_camera_orbit(float angle) {
     camera.dir = vec_norm(to_sun);
 }
 
-/** 
+
 void update_camera_position(uint16_t scanCode, float timeStep){
     Vec3 sun_pos = g_spheres[1].center;
 
@@ -438,7 +438,6 @@ void update_camera_position(uint16_t scanCode, float timeStep){
     if(scanCode == 0xF01D || scanCode == 0xF01B) camera.orig = get_camera_position_vertical(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta, camera.phi);
     update_camera_orbit(camera.theta);
 }
-*/
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
     Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1, .hit_type = -1};
@@ -694,7 +693,6 @@ Color trace_path(int16_t x, int16_t y) {
         float theta = camera.theta;
         float phi = camera.phi;
 
-        /** 
         if(SCANCODE == 0xF01C || SCANCODE == 0xF023){
             Vec3 forward = vec_norm(camera.dir);
             Vec3 up = (Vec3){F(0), F(1), F(0)};
@@ -724,7 +722,6 @@ Color trace_path(int16_t x, int16_t y) {
             );
             r.dir = vec_norm(dir);
         }
-            */
 
         Vec3 path_color = {F(0), F(0), F(0)};
         Vec3 path_attenuation = {ONE, ONE, ONE};
@@ -902,7 +899,6 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-/*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
@@ -938,4 +934,3 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Rendering complete!\n");
     return 0;
 } 
-*/

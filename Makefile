@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -std=c99 -Wall -Wextra -O3 -march=native -ffast-math
-TARGET = build/raytracer1
+TARGET = build/raytracer
 SOURCE = raytracetemp.c
 
 TOTAL_TIME = $(shell echo "scale=8; 3 * 3.141592653589793" | bc -l)
