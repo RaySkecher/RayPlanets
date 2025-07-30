@@ -20,6 +20,7 @@
 #define PLANET1_ORBIT_SPEED 1.0f
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
+#define CAMERA_ORBIT_RADIUS
 
 // Scene dimensions
 #define NUM_SPHERES 3
@@ -27,6 +28,7 @@
 
 #define HEIGHT 256
 #define WIDTH 256
+#define SCANCODE 0xF023
 
 // Fixed-point math settings — 16-bit total (4 integer + 12 fractional)
 typedef int16_t fp_t;
