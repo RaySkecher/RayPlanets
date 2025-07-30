@@ -419,7 +419,7 @@ void update_camera_orbit(float angle) {
     camera.dir = vec_norm(to_sun);
 }
 
-/** 
+
 void update_camera_position(uint16_t scanCode, float timeStep){
     Vec3 sun_pos = g_spheres[1].center;
 
@@ -438,7 +438,7 @@ void update_camera_position(uint16_t scanCode, float timeStep){
     if(scanCode == 0xF01D || scanCode == 0xF01B) camera.orig = get_camera_position_vertical(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta, camera.phi);
     update_camera_orbit(camera.theta);
 }
-*/
+
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
     Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1, .hit_type = -1};
