@@ -23,7 +23,7 @@
 
 // Scene dimensions
 #define NUM_SPHERES 3
-#define NUM_PLANES 0
+#define NUM_RINGS 2
 
 #define HEIGHT 256
 #define WIDTH 256
@@ -71,8 +71,19 @@ typedef struct {
 typedef struct {
     int32_t t;            // keep 32-bit for extra head-room during comparisons
     int hit_index;
+    int hit_type;        // 0 = sphere, 1 = ring
     int hit;      // 1 if an object was hit, 0 otherwise
 } Intersection;
+
+//Ring
+typedef struct {
+    Vec3 center;
+    Vec3 normal;
+    fp_t inner_radius;
+    fp_t outer_radius;
+    fp_t ellipse_ratio;
+    Material material;
+} Ring;
 
 #define UNIT_VECTOR_LUT_SIZE 128
 // 64 pre-computed unit vectors stored at 8.8 precision; they will be left-shifted
@@ -240,6 +251,7 @@ static fp_t get_deterministic_rand_fp(uint32_t seed) {
 int is_on_light(Vec3 p);
 int32_t intersect_sphere(Ray r, Sphere s);
 Intersection intersect_scene(Ray r);
+int32_t intersect_ring(Ray r, Ring ring);
 
 
 // Vector operations
@@ -257,6 +269,8 @@ Vec3 vec_norm(Vec3 v) {
     int32_t inv_len = inv_sqrt_fp(len_sq);
     return vec_scale(v, inv_len);
 }
+
+
 
 // Rotation matrix operations for orbital motion
 Vec3 rotate_y(Vec3 v, float angle) {
@@ -289,22 +303,68 @@ void update_planet_positions(float time) {
     g_spheres[2].center = get_orbital_position(sun_pos, PLANET2_ORBIT_RADIUS, PLANET2_ORBIT_SPEED, time);
 }
 
+Ring g_rings[NUM_RINGS];
+
+void update_ring_positions() {
+    for (int i = 0; i < NUM_RINGS; ++i)
+        g_rings[i].center = g_spheres[2].center;
+}
+
+void setup_rings() {
+    Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
+
+    // Manually customized ring sizes and colors
+    fp_t inner_radii[NUM_RINGS] = {F(0.2), F(0.3)};  // > planet radius (0.15)
+    fp_t outer_radii[NUM_RINGS] = {F(0.25), F(0.35)};
+    fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
+    Vec3 colors[NUM_RINGS] = {
+        {F(0.4), F(0.4), F(0.5)},
+        {F(0.2), F(0.2), F(0.3)}
+    };
+
+    for (int i = 0; i < NUM_RINGS; ++i) {
+         g_rings[i].center = jupiter_center;
+
+        // All rings lie in roughly the same flat orbital plane
+        g_rings[i].normal = vec_norm((Vec3){F(0.1), F(1), F(0.1)});
+
+        g_rings[i].inner_radius = inner_radii[i];
+        g_rings[i].outer_radius = outer_radii[i];
+        g_rings[i].ellipse_ratio = ellipse_ratios[i];
+
+        g_rings[i].material = (Material){
+            .color = colors[i],
+            .is_light = 0
+        };
+    }
+}
+
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
-    int32_t dists[NUM_SPHERES];
-    Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1};
+    Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1, .hit_type = -1};
+    int32_t closest_t = FP_INF;
 
-    // Compute intersection distances for all spheres
-    for (size_t i = 0; i < NUM_SPHERES; ++i) {
-        dists[i] = intersect_sphere(r, g_spheres[i]);
+    // Check spheres
+    for (int i = 0; i < NUM_SPHERES; ++i) {
+        int32_t t = intersect_sphere(r, g_spheres[i]);
+        if (t < closest_t) {
+            closest_t = t;
+            result.t = t;
+            result.hit_index = i;
+            result.hit_type = 0;  // sphere
+            result.hit = 1;
+        }
     }
 
-    // Find the closest intersection
-    for (size_t k = 0; k < NUM_SPHERES; ++k) {
-        if (dists[k] < result.t) {
-            result.t = dists[k];
-            result.hit_index = k;
-            result.hit = 1;  
+    // Check rings
+    for (int i = 0; i < NUM_RINGS; ++i) {
+        int32_t t = intersect_ring(r, g_rings[i]);
+        if (t < closest_t) {
+            closest_t = t;
+            result.t = t;
+            result.hit_index = i;
+            result.hit_type = 1;  // ring
+            result.hit = 1;
         }
     }
 
@@ -333,7 +393,37 @@ int32_t intersect_sphere(Ray r, Sphere s) {
     return FP_INF;
 }
 
-// Ray-plane intersection
+int32_t intersect_ring(Ray r, Ring ring) {
+    int32_t denom = vec_dot(ring.normal, r.dir);
+    if (denom > -FP_EPS && denom < FP_EPS) return FP_INF;
+
+    int32_t t = div_fp(vec_dot(ring.normal, vec_sub(ring.center, r.orig)), denom);
+    if (t <= FP_EPS) return FP_INF;
+
+    Vec3 hit_point = vec_add(r.orig, vec_scale(r.dir, t));
+    Vec3 d = vec_sub(hit_point, ring.center);
+    // Elliptical ring check (assume ellipse lies in XZ-plane)
+    int32_t x = d.x;
+    int32_t z = d.z;
+
+    int32_t a = ring.outer_radius;
+    int32_t b = mul(a, ring.ellipse_ratio);  // semi-minor axis
+
+    int32_t x_term = div_fp(mul(x, x), mul(a, a));
+    int32_t z_term = div_fp(mul(z, z), mul(b, b));
+    int32_t ellipse_outer = x_term + z_term;
+
+    int32_t a_inner = ring.inner_radius;
+    int32_t b_inner = mul(a_inner, ring.ellipse_ratio);
+
+    int32_t x_term_inner = div_fp(mul(x, x), mul(a_inner, a_inner));
+    int32_t z_term_inner = div_fp(mul(z, z), mul(b_inner, b_inner));
+    int32_t ellipse_inner = x_term_inner + z_term_inner;
+
+    if (ellipse_outer > ONE || ellipse_inner < ONE) return FP_INF;
+
+    return t;
+}
 
 
 Color trace_path(int16_t x, int16_t y) {
@@ -421,8 +511,18 @@ Color trace_path(int16_t x, int16_t y) {
             Vec3 hit_normal;
             Material mat;
 
-            mat = g_spheres[hit_object_index].material;
-            hit_normal = vec_norm(vec_sub(hit_point, g_spheres[hit_object_index].center));
+           if (inter.hit_type == 0) { // Sphere
+                mat = g_spheres[hit_object_index].material;
+                hit_normal = vec_norm(vec_sub(hit_point, g_spheres[hit_object_index].center));
+            } else if (inter.hit_type == 1) { // Ring
+                mat = g_rings[hit_object_index].material;
+                hit_normal = g_rings[hit_object_index].normal;
+                if (vec_dot(hit_normal, r.dir) > 0) {
+                    hit_normal.x = -hit_normal.x;
+                    hit_normal.y = -hit_normal.y;
+                    hit_normal.z = -hit_normal.z;
+                }
+            }
 
             Material surface_mat = mat;
             if (mat.is_light) { // If we hit the ceiling plane
@@ -445,6 +545,15 @@ Color trace_path(int16_t x, int16_t y) {
             for (size_t i = 0; i < NUM_SPHERES; ++i) {
                 if (i == hit_object_index || i == 1) continue; // Skip the hit object and light source
                 int32_t shadow_t = intersect_sphere(shadow_ray, g_spheres[i]);
+                if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) {
+                    occluded = 1;
+                    break;
+                }
+            }
+
+            for (size_t i = 0; i < NUM_RINGS; ++i) {
+                if (i == hit_object_index) continue; // Skip the hit ring
+                int32_t shadow_t = intersect_ring(shadow_ray, g_rings[i]);
                 if (shadow_t < FP_INF && mul(shadow_t, shadow_t) < dist_sq) {
                     occluded = 1;
                     break;
@@ -491,22 +600,49 @@ Color trace_path(int16_t x, int16_t y) {
     return (Color){fp_to_u8((fp_t)(acc_r / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_g / NUM_SAMPLES)), fp_to_u8((fp_t)(acc_b / NUM_SAMPLES))};
 }
 
+// New top-level function for Vitis HLS
+void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
+    // HLS INTERFACE pragmas define how arguments map to hardware ports
+    #pragma HLS INTERFACE s_axilite port=animation_time bundle=control
+    #pragma HLS INTERFACE m_axi port=output_buffer offset=slave bundle=gmem
+    #pragma HLS INTERFACE s_axilite port=return bundle=control
+
+    // Initialize ring properties once per frame (or once if animation_time is fixed)
+    setup_rings(); 
+
+    // Update planet and ring positions for current animation time
+    update_planet_positions(animation_time);
+    update_ring_positions(); 
+    
+    // Render each pixel
+    #pragma HLS DATAFLOW
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            #pragma HLS pipeline II=1
+            output_buffer[y][x] = trace_path(x, y);
+        }
+    }
+}
+
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
 
+/*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
     if (argc > 1) {
         animation_time = atof(argv[1]);
     }
-    
+
     // Update planet positions for current animation time
     update_planet_positions(animation_time);
-    
+    setup_rings();
+    update_ring_positions();
+
     // Create PPM image header
     printf("P3\n");
     printf("%d %d\n", WIDTH, HEIGHT);
-    printf("255\n");
+    printf("255\n"); 
     
     // Render each pixel
     for (int y = 0; y < HEIGHT; y++) {
@@ -524,4 +660,4 @@ int main(int argc, char *argv[]) {
     
     fprintf(stderr, "Rendering complete!\n");
     return 0;
-}
+} */
