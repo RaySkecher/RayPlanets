@@ -85,6 +85,13 @@ typedef struct {
     Material material;
 } Ring;
 
+typedef struct {
+    Vec3 orig;
+    Vec3 dir;
+    float theta;
+    float phi;
+} Camera;
+
 #define UNIT_VECTOR_LUT_SIZE 128
 // 64 pre-computed unit vectors stored at 8.8 precision; they will be left-shifted
 // at runtime to 4.12 to keep the table small and readable.
