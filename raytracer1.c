@@ -677,7 +677,7 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-
+/*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
@@ -712,4 +712,4 @@ int main(int argc, char *argv[]) {
     
     fprintf(stderr, "Rendering complete!\n");
     return 0;
-} 
+} */
