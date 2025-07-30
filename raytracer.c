@@ -23,7 +23,7 @@
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
 
-#define CAMERA_ORBIT_RADIUS
+#define CAMERA_ORBIT_RADIUS 4.0f
 // Scene dimensions
 #define NUM_SPHERES 3
 #define NUM_RINGS 2
