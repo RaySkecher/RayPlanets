@@ -12,7 +12,7 @@
 // Path tracing settings
 #define MAX_BOUNCES 1
 #define FOV 70.0
-#define LIGHT_INTENSITY 3.0
+#define LIGHT_INTENSITY 1.0
 #define BRIGHTNESS_SHIFT 4
 #define NUM_SAMPLES 16
 
@@ -552,18 +552,6 @@ float layerdPerlin_noise(Vec3 positiion, int layers){
 }
 
 
-float blendFactor(int32_t lattitude, int32_t min_fp, int32_t max_fp){
-    int32_t range = max_fp - min_fp;
-    if (range == 0) return 0; // Avoid division by zero
-    
-    int32_t pos = lattitude - min_fp;
-    int32_t t = div_fp(pos, range);
-    
-    // Clamp to 0-1 range
-    if (t < 0) return 0;
-    if (t > ONE) return ONE;
-    return t;
-}
 
 Vec3 convert_color(Vec3 colorRGB){
     return (Vec3){F(colorRGB.x/255.0),F(colorRGB.y/255.0),F(colorRGB.z/255.0)};
@@ -572,39 +560,50 @@ Vec3 convert_color(Vec3 colorRGB){
 Vec3 getPlanetColor(Vec3 hit_point, Vec3 hit_normal, int hit_object_index){
     int32_t lattitude = abs(hit_normal.y);
     int32_t terrain_noise_fp = F(layerdPerlin_noise(hit_point, COLOR_LAYERS));
+    Vec3 color[COLOR_LAYERS];
 
-    //Terrian_boundries - use first value to change boumdries
-    int32_t ice_start = F(1.0f) + mul(terrain_noise_fp, F(0.1f));
-    int32_t ice_end = F(0.65f) + mul(terrain_noise_fp, F(0.1f));
-    int32_t forest_start = F(0.6f) + mul(terrain_noise_fp, F(0.1f));
-    int32_t forest_end = F(0.2f) + mul(terrain_noise_fp, F(0.1f));
-    int32_t desert_start = F(0.15f) + mul(terrain_noise_fp, F(0.1f));
-    int32_t desert_end = F(0.0f) + mul(terrain_noise_fp, F(0.1f));
+    for (int i = 0; i < COLOR_LAYERS; i++){
+        color[i] = g_spheres[hit_object_index].material.color;
+    }
 
-    //Get color scaling facotr
-    int32_t ice_factor = F(blendFactor(lattitude,ice_end,ice_start)); //0.5 radius is above max size of planets 
-    int32_t forest_factor = F(blendFactor(lattitude, forest_end,forest_start));
-    int32_t desert_factor = F(blendFactor(lattitude,desert_end, desert_start)); //0 = smalled radius 
+    //Terrian_boundries 
+    int32_t ice_start = F(0.9) + mul(terrain_noise_fp, F(0.1));
+    int32_t ice_end = F(0.8) + mul(terrain_noise_fp, F(0.1));
+    int32_t forest_start = F(0.8) + mul(terrain_noise_fp, F(0.1));
+    int32_t forest_end = F(0.4) + mul(terrain_noise_fp, F(0.1));
+    int32_t desert_start = F(0.4) + mul(terrain_noise_fp, F(0.1));
+    int32_t desert_end = F(0.0) + mul(terrain_noise_fp, F(0.1));
 
+    
     //Colors
-
-    Vec3 ice_color = convert_color((Vec3){185, 232, 234});
-    Vec3 forest_color = convert_color((Vec3){34, 139, 34});
-    Vec3 desert_color = convert_color((Vec3){210, 180, 140});
+    switch (hit_object_index)
+    {
+    case 0:
+        color[0] = convert_color((Vec3){245, 236, 213}); //ice
+        color[1] = convert_color((Vec3){98, 111, 71}); //forest
+        color[2] = convert_color((Vec3){240, 187, 120}); //desert
+        break;
+    case 2:
+        color[0]= convert_color((Vec3){216,174,109});
+        color[1] = convert_color((Vec3){255,225,171});
+        color[2] = convert_color((Vec3){219,181,124});
+    default:
+        break;
+    }
 
     //Caculate colors
     //F(value = percent of surface)
     if (lattitude >= ice_end && lattitude < ice_start){
-        return vec_scale(ice_color, ice_factor);
+        return color[0];
     }
     else if (lattitude >= forest_end && lattitude < forest_start){
-        return vec_scale(forest_color, forest_factor);
+        return color[1];
     }
     else if (lattitude >= desert_end && lattitude < desert_start){
-        return vec_scale(desert_color, desert_factor);
+        return color[2];
     }
-    else return desert_color; //you fucked up
-    }
+    else return (Vec3){255,255,255};
+}
 
 Color trace_path(int16_t x, int16_t y) {
     //#pragma HLS ALLOCATION function instances=mul limit=32
