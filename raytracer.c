@@ -171,13 +171,6 @@ static const Vec3 gradient_ray_perlin[12] = {
     {0, 1, 1},{0, -1, 1},{0, 1, -1},{0, -1, -1}
 };
 
-static const Vec3 gradient_ray_perlin[12] = {
-    {1, 1, 0},{-1, 1, 0},{1 ,-1, 0},{-1, -1, 0},
-    {1, 0, 1},{-1, 0, 1},{1 ,0, -1},{-1, 0, -1},
-    {0, 1, 1},{0, -1, 1},{0, 1, -1},{0, -1, -1}
-};
-
-
 
 // Fixed-point multiplication
 // 8.8 fixed-point multiply (fp_t × fp_t → 32-bit)
