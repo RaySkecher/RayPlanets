@@ -20,14 +20,10 @@
 #define PLANET1_ORBIT_SPEED 1.0f
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
-#define PLANET3_ORBIT_RADIUS 3.0f
-#define PLANET3_ORBIT_SPEED 1.4f
-#define PLANET4_ORBIT_RADIUS 3.5f  
-#define PLANET4_ORBIT_SPEED 0.8f
 
 // Scene dimensions
-#define NUM_SPHERES 5
-#define NUM_RINGS 2
+#define NUM_SPHERES 3
+#define NUM_RINGS 5
 
 #define HEIGHT 256
 #define WIDTH 256
@@ -85,7 +81,7 @@ typedef struct {
     Vec3 normal;
     fp_t inner_radius;
     fp_t outer_radius;
-    fp_t ellipse_ratio;
+    //fp_t ellipse_ratio;
     Material material;
 } Ring;
 
@@ -160,9 +156,7 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
 static Sphere g_spheres[NUM_SPHERES] = {
     {.center = {.x = F(0.7), .y = F(0.75), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
     {.center = {.x = F(0.0), .y = F(0.75), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
-    {.center = {.x = F(-0.8), .y = F(0.75), .z = F(-0.7)}, .radius = F(0.3), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
-    {.center = {.x = F(-1.2), .y = F(0.75), .z = F(-0.4)}, .radius = F(0.1), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}},
-    {.center = {.x = F(1.0), .y = F(0.75), .z = F(1.1)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}} 
+    {.center = {.x = F(-0.8), .y = F(0.75), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
    
 };
 
@@ -307,34 +301,30 @@ void update_planet_positions(float time) {
     
     // Update Planet 2 (index 2) 
     g_spheres[2].center = get_orbital_position(sun_pos, PLANET2_ORBIT_RADIUS, PLANET2_ORBIT_SPEED, time);
-
-    // Update Planet 3 (index 3) 
-    g_spheres[3].center = get_orbital_position(sun_pos, PLANET3_ORBIT_RADIUS, PLANET3_ORBIT_SPEED, time);
-
-    // Update Planet 4 (index 4) 
-    g_spheres[4].center = get_orbital_position(sun_pos, PLANET4_ORBIT_RADIUS, PLANET4_ORBIT_SPEED, time);
 }
 
 Ring g_rings[NUM_RINGS];
 
 void update_ring_positions() {
-    for (int i = 0; i < NUM_RINGS; ++i)
-        g_rings[i].center = g_spheres[2].center;
+    for (int i = 0; i < 2; ++i) g_rings[i].center = g_spheres[2].center;
+    for (int i = 2 ; i < NUM_RINGS ; ++i ) g_rings[i].center = g_spheres[0].center;
 }
 
 void setup_rings() {
     Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
-
+    Vec3 orange_center = g_spheres[0].center;
     // Manually customized ring sizes and colors
-    fp_t inner_radii[NUM_RINGS] = {F(0.2), F(0.3)};  // > planet radius (0.15)
-    fp_t outer_radii[NUM_RINGS] = {F(0.25), F(0.35)};
-    fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
+    fp_t inner_radii[NUM_RINGS] = {F(0.25), F(0.35), F(0.35)};  // > planet radius (0.15)
+    fp_t outer_radii[NUM_RINGS] = {F(0.3), F(0.4), F(0.5)};
+    //fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
     Vec3 colors[NUM_RINGS] = {
         {F(0.4), F(0.4), F(0.5)},
-        {F(0.2), F(0.2), F(0.3)}
+        {F(0.2), F(0.2), F(0.3)},
+        {F(0.5), F(0.3), F(0.1)},
     };
 
-    for (int i = 0; i < NUM_RINGS; ++i) {
+    //blue planet
+    for (int i = 0; i < 2; ++i) {
          g_rings[i].center = jupiter_center;
 
         // All rings lie in roughly the same flat orbital plane
@@ -342,7 +332,23 @@ void setup_rings() {
 
         g_rings[i].inner_radius = inner_radii[i];
         g_rings[i].outer_radius = outer_radii[i];
-        g_rings[i].ellipse_ratio = ellipse_ratios[i];
+        //g_rings[i].ellipse_ratio = ellipse_ratios[i];
+
+        g_rings[i].material = (Material){
+            .color = colors[i],
+            .is_light = 0
+        };
+    }
+
+    //orange planet
+    for (int i = 2; i < 4; ++i) {
+         g_rings[i].center = orange_center;
+
+        // All rings lie in roughly the same flat orbital plane
+        g_rings[i].normal = vec_norm((Vec3){F(-0.5), F(1), F(0)});
+
+        g_rings[i].inner_radius = inner_radii[i];
+        g_rings[i].outer_radius = outer_radii[i];
 
         g_rings[i].material = (Material){
             .color = colors[i],
@@ -406,36 +412,24 @@ int32_t intersect_sphere(Ray r, Sphere s) {
 }
 
 int32_t intersect_ring(Ray r, Ring ring) {
+    // Ring plane intersection (dot(n, P - C) = 0)
     int32_t denom = vec_dot(ring.normal, r.dir);
-    if (denom > -FP_EPS && denom < FP_EPS) return FP_INF;
+    if (abs(denom) < F(0.0001)) return FP_INF;  // Parallel
 
     int32_t t = div_fp(vec_dot(ring.normal, vec_sub(ring.center, r.orig)), denom);
-    if (t <= FP_EPS) return FP_INF;
+    if (t < 0) return FP_INF;
 
-    Vec3 hit_point = vec_add(r.orig, vec_scale(r.dir, t));
-    Vec3 d = vec_sub(hit_point, ring.center);
-    // Elliptical ring check (assume ellipse lies in XZ-plane)
-    int32_t x = d.x;
-    int32_t z = d.z;
+    Vec3 p = vec_add(r.orig, vec_scale(r.dir, t));
+    Vec3 rel = vec_sub(p, ring.center);
+    int32_t dist2 = vec_dot(rel, rel);  // use circular distance
 
-    int32_t a = ring.outer_radius;
-    int32_t b = mul(a, ring.ellipse_ratio);  // semi-minor axis
-
-    int32_t x_term = div_fp(mul(x, x), mul(a, a));
-    int32_t z_term = div_fp(mul(z, z), mul(b, b));
-    int32_t ellipse_outer = x_term + z_term;
-
-    int32_t a_inner = ring.inner_radius;
-    int32_t b_inner = mul(a_inner, ring.ellipse_ratio);
-
-    int32_t x_term_inner = div_fp(mul(x, x), mul(a_inner, a_inner));
-    int32_t z_term_inner = div_fp(mul(z, z), mul(b_inner, b_inner));
-    int32_t ellipse_inner = x_term_inner + z_term_inner;
-
-    if (ellipse_outer > ONE || ellipse_inner < ONE) return FP_INF;
+    if (dist2 < mul(ring.inner_radius, ring.inner_radius) ||
+        dist2 > mul(ring.outer_radius, ring.outer_radius))
+        return FP_INF;
 
     return t;
 }
+
 
 
 Color trace_path(int16_t x, int16_t y) {
@@ -637,7 +631,7 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-/*
+
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
@@ -671,4 +665,4 @@ int main(int argc, char *argv[]) {
     
     fprintf(stderr, "Rendering complete!\n");
     return 0;
-} */
+} 
