@@ -672,10 +672,9 @@ Color trace_path(int16_t x, int16_t y) {
     //#pragma HLS ALLOCATION function instances=intersect_sphere limit=1
     #pragma HLS bind_storage variable=g_unit_vector_lut type=rom_1p
 
-    Ray cam = {{F(0), F(1.2), F(3)}, {F(0), F(0), F(-1)}};
     float fov_rad = FOV * M_PI / 180.0;
     float fov_scale = tan(fov_rad / 2.0);
-    //float aspect_ratio = (float)WIDTH / HEIGHT;
+    float aspect_ratio = (float)WIDTH / HEIGHT;
 
     float sx_ndc = (2.0f * (x) / WIDTH) - 1.0f;
     float sy_ndc = 1.0f - (2.0f * (y) / HEIGHT);
@@ -685,10 +684,44 @@ Color trace_path(int16_t x, int16_t y) {
     int32_t acc_r = 0, acc_g = 0, acc_b = 0;
 
     for (int sample = 0; sample < NUM_SAMPLES; sample++) {
-        r = cam;
-        r.dir.x = F(sx_ndc * fov_scale);
-        r.dir.y = F(sy_ndc * fov_scale);
-        r.dir = vec_norm(r.dir);
+        r.orig = camera.orig;
+
+        float sx = fov_scale * sx_ndc;
+        float sy = fov_scale * sy_ndc;
+
+        float theta = camera.theta;
+        float phi = camera.phi;
+
+        if(SCANCODE == 0xF01C || SCANCODE == 0xF023){
+            Vec3 forward = vec_norm(camera.dir);
+            Vec3 up = (Vec3){F(0), F(1), F(0)};
+            Vec3 right = vec_norm((Vec3){forward.z, F(0), -forward.x});  
+            Vec3 dir = vec_add(
+                vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
+                forward
+            );
+            r.dir = vec_norm(dir);
+        }
+        if(SCANCODE == 0xF01D || SCANCODE == 0xF01B){
+            Vec3 forward = vec_norm(camera.dir);
+            Vec3 right = {
+                F(-sinf(theta)),
+                F(0),
+                F(cosf(theta))
+            };
+
+            Vec3 up = {
+                F(cosf(phi) * cosf(theta)),
+                F(-sinf(phi)),
+                F(cosf(phi) * sinf(theta))
+            };
+            Vec3 dir = vec_add(
+                vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
+                forward
+            );
+            r.dir = vec_norm(dir);
+        }
+
         Vec3 path_color = {F(0), F(0), F(0)};
         Vec3 path_attenuation = {ONE, ONE, ONE};
 
