@@ -90,6 +90,13 @@ typedef struct {
 } Ring;
 
 typedef struct {
+    Vec3 orig;
+    Vec3 dir;
+    float theta;
+    float phi;
+} Camera;
+
+typedef struct {
     float x, y, z;
 } Vec3f;
 
@@ -159,6 +166,13 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
     {.x = 210, .y = 195, .z =  66}, {.x = -210, .y = -195, .z =  -66},
     {.x = 195, .y =  66, .z = 210}, {.x = -195, .y =  -66, .z = -210},
     {.x = 110, .y = 180, .z = 210}, {.x = -110, .y = -180, .z = -210}
+};
+
+static Camera camera = {
+    .orig = {.x = F(0), .y = F(1.2),.z = F(1)}, 
+    .dir = {.x = F(0), .y = F(0), .z = F(-1)}, 
+    .theta = M_PI, 
+    .phi = M_PI,
 };
 
 static Sphere g_spheres[NUM_SPHERES] = {
@@ -335,12 +349,13 @@ void setup_rings() {
     Vec3 jupiter_center = g_spheres[2].center;  // Position of Jupiter
     Vec3 orange_center = g_spheres[0].center;
     // Manually customized ring sizes and colors
-    fp_t inner_radii[NUM_RINGS] = {F(0.25), F(0.35), F(0.35)};  // > planet radius (0.15)
-    fp_t outer_radii[NUM_RINGS] = {F(0.3), F(0.4), F(0.5)};
+    fp_t inner_radii[NUM_RINGS] = {F(0.25), F(0.35), F(0.3), F(0.4)};  // > planet radius (0.15)
+    fp_t outer_radii[NUM_RINGS] = {F(0.3), F(0.4), F(0.38),F(0.45)};
     //fp_t ellipse_ratios[NUM_RINGS] = {F(1.0), F(0.95)};
     Vec3 colors[NUM_RINGS] = {
         {F(0.4), F(0.4), F(0.5)},
         {F(0.2), F(0.2), F(0.3)},
+        {F(0.15), F(0.08), F(0.05)},
         {F(0.5), F(0.3), F(0.1)},
     };
 
@@ -376,6 +391,50 @@ void setup_rings() {
             .is_light = 0
         };
     }
+}
+
+Vec3 spherical_to_cartesian(float radius, float theta, float phi) {
+    float x = radius * sinf(phi) * cosf(theta);
+    float y = radius * cosf(phi);
+    float z = radius * sinf(phi) * sinf(theta);
+    return (Vec3){ F(x), F(y), F(z) };
+}
+
+Vec3 get_camera_position_horizontal(Vec3 sun_center, float orbit_radius, float angle){
+    Vec3 offset = (Vec3){F(0), F(2), F(orbit_radius)};
+    Vec3 rotated_offset = rotate_y(offset, angle);
+    return vec_add(sun_center, rotated_offset);
+}
+
+Vec3 get_camera_position_vertical(Vec3 center, float radius, float theta, float phi) {
+    Vec3 offset = spherical_to_cartesian(radius, theta, phi);
+    return vec_add(center, offset);
+}
+
+void update_camera_orbit(float angle) {
+    Vec3 sun_pos = g_spheres[1].center;
+    Vec3 to_sun = vec_sub(sun_pos, camera.orig);
+    camera.dir = vec_norm(to_sun);
+}
+
+
+void update_camera_position(uint16_t scanCode, float timeStep){
+    Vec3 sun_pos = g_spheres[1].center;
+
+     // A key: rotate left
+    if (scanCode == 0xF01C) camera.theta -= timeStep;
+    // D key: rotate right
+    if (scanCode == 0xF023) camera.theta += timeStep;
+    // W key: rotate up
+    if(scanCode == 0xF01D) camera.phi += timeStep;
+    // S key: rotate down
+    if(scanCode == 0xF01B) camera.phi -= timeStep;
+
+
+    // Update camera position
+    if(scanCode == 0xF01C || scanCode == 0xF023) camera.orig = get_camera_position_horizontal(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta);
+    if(scanCode == 0xF01D || scanCode == 0xF01B) camera.orig = get_camera_position_vertical(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta, camera.phi);
+    update_camera_orbit(camera.theta);
 }
 
 // Returns an Intersection result.
@@ -638,11 +697,9 @@ Color trace_path(int16_t x, int16_t y) {
             Intersection inter = intersect_scene(r);
 
             if (!inter.hit) {
-                // deep_purple_blue: now approximates ~RGB(40, 20, 100)
-                // light_purple_blue: now approximates ~RGB(100, 80, 200)
                 //Both values adjusted for BRIGHTNESS_SHIFT
-                Vec3 deep_purple_blue = {F(0.0098), F(0.0049), F(0.0245)}; 
-                Vec3 light_purple_blue = {F(0.0245), F(0.0196), F(0.049)};
+                Vec3 deep_purple_blue = {F(0.039 / 16.0), F(0.039 / 16.0), F(0.098/ 16.0)}; 
+                Vec3 light_purple_blue = {F(0.071 / 16.0), F(0.118 / 16.0), F(0.294 / 16.0)};
 
                 // Get interpolation factor based on ray's Y-direction (vertical position)
                 // Map r.dir.y from [-ONE, ONE] to [0, ONE]
@@ -808,7 +865,7 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-
+/*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
@@ -843,3 +900,4 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Rendering complete!\n");
     return 0;
 } 
+*/

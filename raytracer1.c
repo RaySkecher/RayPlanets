@@ -45,6 +45,10 @@ typedef int16_t fp_t;
 //Textures
 #define COLOR_LAYERS 3
 
+//Textures
+#define COLOR_LAYERS 3
+
+#define SCANCODE 0xF023
 // Simple vector struct
 typedef struct {
     fp_t x, y, z;
@@ -92,6 +96,13 @@ typedef struct {
     fp_t ellipse_ratio;
     Material material;
 } Ring;
+
+typedef struct {
+    Vec3 orig;
+    Vec3 dir;
+    float theta;
+    float phi;
+} Camera;
 
 #define UNIT_VECTOR_LUT_SIZE 128
 // 64 pre-computed unit vectors stored at 8.8 precision; they will be left-shifted
@@ -161,7 +172,12 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
     {.x = 110, .y = 180, .z = 210}, {.x = -110, .y = -180, .z = -210}
 };
 
-static Ray camera = {.orig = {.x = F(0), .y = F(2),.z = F(1)}, .dir = {.x = F(0), .y = F(0), .z = F(-1)}};
+static Camera camera = {
+    .orig = {.x = F(0), .y = F(1.2),.z = F(1)}, 
+    .dir = {.x = F(0), .y = F(0), .z = F(-1)}, 
+    .theta = M_PI, 
+    .phi = M_PI,
+};
 
 static Sphere g_spheres[NUM_SPHERES] = {
     {.center = {.x = F(0.7), .y = F(0.75), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
@@ -366,39 +382,48 @@ void setup_rings() {
     }
 }
 
+Vec3 spherical_to_cartesian(float radius, float theta, float phi) {
+    float x = radius * sinf(phi) * cosf(theta);
+    float y = radius * cosf(phi);
+    float z = radius * sinf(phi) * sinf(theta);
+    return (Vec3){ F(x), F(y), F(z) };
+}
 
-Vec3 get_camera_position(Vec3 sun_center, float orbit_radius, float angle){
+Vec3 get_camera_position_horizontal(Vec3 sun_center, float orbit_radius, float angle){
     Vec3 offset = (Vec3){F(0), F(2), F(orbit_radius)};
     Vec3 rotated_offset = rotate_y(offset, angle);
     return vec_add(sun_center, rotated_offset);
 }
 
+Vec3 get_camera_position_vertical(Vec3 center, float radius, float theta, float phi) {
+    Vec3 offset = spherical_to_cartesian(radius, theta, phi);
+    return vec_add(center, offset);
+}
+
 void update_camera_orbit(float angle) {
     Vec3 sun_pos = g_spheres[1].center;
-
-    // Orbit camera around Y-axis at fixed radius
-    // float x = CAMERA_ORBIT_RADIUS * sinf(angle);
-    // float z = CAMERA_ORBIT_RADIUS * cosf(angle);
-    // camera.orig = (Vec3){F(x), F(3), F(z)};  // Keep eye level fixed
-
-    // Point toward the sun
     Vec3 to_sun = vec_sub(sun_pos, camera.orig);
     camera.dir = vec_norm(to_sun);
 }
 
-static float camera_angle = M_PI;
 
 void update_camera_position(uint16_t scanCode, float timeStep){
     Vec3 sun_pos = g_spheres[1].center;
 
-    // A key: rotate left
-    if (scanCode == 0xF01C) camera_angle -= timeStep;
+     // A key: rotate left
+    if (scanCode == 0xF01C) camera.theta -= timeStep;
     // D key: rotate right
-    if (scanCode == 0xF023) camera_angle += timeStep;
+    if (scanCode == 0xF023) camera.theta += timeStep;
+    // W key: rotate up
+    if(scanCode == 0xF01D) camera.phi += timeStep;
+    // S key: rotate down
+    if(scanCode == 0xF01B) camera.phi -= timeStep;
+
 
     // Update camera position
-    camera.orig = get_camera_position(sun_pos, CAMERA_ORBIT_RADIUS, camera_angle);
-    update_camera_orbit(camera_angle);
+    if(scanCode == 0xF01C || scanCode == 0xF023) camera.orig = get_camera_position_horizontal(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta);
+    if(scanCode == 0xF01D || scanCode == 0xF01B) camera.orig = get_camera_position_vertical(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta, camera.phi);
+    update_camera_orbit(camera.theta);
 }
 
 // Returns an Intersection result.
@@ -664,18 +689,42 @@ Color trace_path(int16_t x, int16_t y) {
     for (int sample = 0; sample < NUM_SAMPLES; sample++) {
         r.orig = camera.orig;
 
-        Vec3 forward = vec_norm(camera.dir);
-        Vec3 up = (Vec3){F(0), F(1), F(0)};
-        Vec3 right = vec_norm((Vec3){forward.z, F(0), -forward.x});  
-
         float sx = fov_scale * sx_ndc;
         float sy = fov_scale * sy_ndc;
 
-        Vec3 dir = vec_add(
-        vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
-        forward
-        );
-        r.dir = vec_norm(dir);
+        float theta = camera.theta;
+        float phi = camera.phi;
+
+        if(SCANCODE == 0xF01C || SCANCODE == 0xF023){
+            Vec3 forward = vec_norm(camera.dir);
+            Vec3 up = (Vec3){F(0), F(1), F(0)};
+            Vec3 right = vec_norm((Vec3){forward.z, F(0), -forward.x});  
+            Vec3 dir = vec_add(
+                vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
+                forward
+            );
+            r.dir = vec_norm(dir);
+        }
+        if(SCANCODE == 0xF01D || SCANCODE == 0xF01B){
+            Vec3 forward = vec_norm(camera.dir);
+            Vec3 right = {
+                F(-sinf(theta)),
+                F(0),
+                F(cosf(theta))
+            };
+
+            Vec3 up = {
+                F(cosf(phi) * cosf(theta)),
+                F(-sinf(phi)),
+                F(cosf(phi) * sinf(theta))
+            };
+            Vec3 dir = vec_add(
+                vec_add(vec_scale(right, F(sx)), vec_scale(up, F(sy))),
+                forward
+            );
+            r.dir = vec_norm(dir);
+        }
+
         Vec3 path_color = {F(0), F(0), F(0)};
         Vec3 path_attenuation = {ONE, ONE, ONE};
 
@@ -863,7 +912,7 @@ int main(int argc, char *argv[]) {
     update_planet_positions(animation_time);
     setup_rings();
     update_ring_positions();
-    update_camera_position(0xF023, animation_time);
+    update_camera_position(SCANCODE, animation_time);
 
     // Create PPM image header
     printf("P3\n");
