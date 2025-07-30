@@ -20,9 +20,13 @@
 #define PLANET1_ORBIT_SPEED 1.0f
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
+#define PLANET3_ORBIT_RADIUS 3.0f
+#define PLANET3_ORBIT_SPEED 1.4f
+#define PLANET4_ORBIT_RADIUS 3.5f  
+#define PLANET4_ORBIT_SPEED 0.8f
 
 // Scene dimensions
-#define NUM_SPHERES 3
+#define NUM_SPHERES 5
 #define NUM_RINGS 2
 
 #define HEIGHT 256
@@ -156,7 +160,9 @@ static const Vec3 g_unit_vector_lut[UNIT_VECTOR_LUT_SIZE] = {
 static Sphere g_spheres[NUM_SPHERES] = {
     {.center = {.x = F(0.7), .y = F(0.75), .z = F(0.1)}, .radius = F(0.2), .material = {.color = {.x = F(0.8), .y = F(0.6), .z = F(0.3)}, .is_light = 0}}, // Planet 1 - orange/brown
     {.center = {.x = F(0.0), .y = F(0.75), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
-    {.center = {.x = F(-0.8), .y = F(0.75), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
+    {.center = {.x = F(-0.8), .y = F(0.75), .z = F(-0.7)}, .radius = F(0.3), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
+    {.center = {.x = F(-1.2), .y = F(0.75), .z = F(-0.4)}, .radius = F(0.1), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}},
+    {.center = {.x = F(1.0), .y = F(0.75), .z = F(1.1)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}} 
    
 };
 
@@ -301,6 +307,12 @@ void update_planet_positions(float time) {
     
     // Update Planet 2 (index 2) 
     g_spheres[2].center = get_orbital_position(sun_pos, PLANET2_ORBIT_RADIUS, PLANET2_ORBIT_SPEED, time);
+
+    // Update Planet 3 (index 3) 
+    g_spheres[3].center = get_orbital_position(sun_pos, PLANET3_ORBIT_RADIUS, PLANET3_ORBIT_SPEED, time);
+
+    // Update Planet 4 (index 4) 
+    g_spheres[4].center = get_orbital_position(sun_pos, PLANET4_ORBIT_RADIUS, PLANET4_ORBIT_SPEED, time);
 }
 
 Ring g_rings[NUM_RINGS];
@@ -625,7 +637,6 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-
 /*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
