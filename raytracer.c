@@ -7,12 +7,14 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+
+
 // Path tracing settings
-#define MAX_BOUNCES 3
+#define MAX_BOUNCES 5
 #define FOV 70.0
 #define LIGHT_INTENSITY 1.0
 #define BRIGHTNESS_SHIFT 4
-#define NUM_SAMPLES 16
+#define NUM_SAMPLES 32
 
 // Animation settings
 #define ANIMATION_TIME 0.0f  // Current time (can be modified for different frames)
@@ -28,6 +30,9 @@
 
 #define HEIGHT 256
 #define WIDTH 256
+
+//Textures
+#define COLOR_LAYERS 3
 
 // Fixed-point math settings — 16-bit total (4 integer + 12 fractional)
 typedef int16_t fp_t;
@@ -159,6 +164,12 @@ static Sphere g_spheres[NUM_SPHERES] = {
     {.center = {.x = F(0.0), .y = F(0.5), .z = F(-0.4)}, .radius = F(0.4), .material = {.color = {.x = F(LIGHT_INTENSITY), .y = F(LIGHT_INTENSITY), .z = F(LIGHT_INTENSITY)}, .is_light = 1}},  // Sun - white light source
     {.center = {.x = F(-0.8), .y = F(0.5), .z = F(-0.7)}, .radius = F(0.15), .material = {.color = {.x = F(0.4), .y = F(0.6), .z = F(0.9)}, .is_light = 0}}, // Planet 2 - blue (smaller)
    
+};
+
+static const Vec3 gradient_ray_perlin[12] = {
+    {1, 1, 0},{-1, 1, 0},{1 ,-1, 0},{-1, -1, 0},
+    {1, 0, 1},{-1, 0, 1},{1 ,0, -1},{-1, 0, -1},
+    {0, 1, 1},{0, -1, 1},{0, 1, -1},{0, -1, -1}
 };
 
 
@@ -410,6 +421,150 @@ int32_t intersect_ring(Ray r, Ring ring) {
     return t;
 }
 
+int32_t abs_fp(int32_t x) {
+    return x < 0 ? -x : x;
+}
+Vec3 convert_color(Vec3 colorRGB){
+    return (Vec3){F(colorRGB.x/255.0),F(colorRGB.y/255.0),F(colorRGB.z/255.0)};
+}
+
+uint32_t hash(int x, int y, int z){ //pesdorandom number generator 
+    return (x*58354)^(y*2754)^(z*9073);
+}
+float fade(float t){
+    return ((6*t - 15)*t + 10)*t*t*t;
+}
+// Linear interpolation: mix a and b by t (0.0 to 1.0)
+float lerp(float a, float b, float t) {
+    return a + t * (b - a);
+}
+//Perlin Noise Function
+float noise(Vec3 hit_point){ //noise generator 
+    //Find cube that the point is contained in
+    int x = (int)floor(hit_point.x) & 255;
+    int y = (int)floor(hit_point.y) & 255;
+    int z = (int)floor(hit_point.z) & 255;
+    //Fractional offset
+    float xf = hit_point.x - floor(hit_point.x);
+    float yf = hit_point.y - floor(hit_point.y);
+    float zf = hit_point.z - floor(hit_point.z);
+    //Lerp setup
+    float u = fade(xf);
+    float v = fade(yf);
+    float w = fade(zf);
+    //Get values from each other verticies 
+    uint16_t index000 = hash(x,y,z) % 12;
+    uint16_t index100 = hash(x+1,y,z) % 12;
+    uint16_t index010 = hash(x,y+1,z) % 12;
+    uint16_t index001 = hash(x,y,z+1) % 12;
+    uint16_t index011 = hash(x,y+1,z+1)% 12;
+    uint16_t index110 = hash(x+1,y+1,z)% 12;
+    uint16_t index101 = hash(x+1,y,z+1)% 12;
+    uint16_t index111 = hash(x+1,y+1,z+1) % 12;
+    //Vectors from corners to hit point 
+    Vec3 b000 = {xf,yf,zf};
+    Vec3 b100 = {xf-1,yf,zf};
+    Vec3 b010 = {xf,yf-1,zf};
+    Vec3 b001 = {xf,yf,zf-1};
+    Vec3 b011 = {xf,yf-1,zf-1};
+    Vec3 b110 = {xf-1,yf-1,zf};
+    Vec3 b101 = {xf-1,yf,zf-1};
+    Vec3 b111 = {xf-1,yf-1,zf-1};
+    //Dot product both vectors 
+    float dot000 = vec_dot(b000, vec_norm(gradient_ray_perlin[index000]));
+    float dot100 = vec_dot(b100, vec_norm(gradient_ray_perlin[index100]));
+    float dot010 = vec_dot(b010, vec_norm(gradient_ray_perlin[index010]));
+    float dot001 = vec_dot(b001, vec_norm(gradient_ray_perlin[index001]));
+    float dot011 = vec_dot(b011, vec_norm(gradient_ray_perlin[index011]));
+    float dot110 = vec_dot(b110, vec_norm(gradient_ray_perlin[index110]));
+    float dot101 = vec_dot(b101, vec_norm(gradient_ray_perlin[index101]));
+    float  dot111 = vec_dot(b111, vec_norm(gradient_ray_perlin[index111]));
+    //Interpolation x
+    float x00 = lerp(dot000, dot100, u);
+    float x01 = lerp(dot001, dot101, u);
+    float x10 = lerp(dot010, dot110, u);
+    float x11 = lerp(dot011, dot111, u);
+    //Interpolation y
+    float y0 = lerp(x00, x10, v);
+    float y1 = lerp(x01, x11, v);
+    //Interpolation z
+    return lerp(y0, y1, w);
+}
+
+
+float layerdPerlin_noise(Vec3 positiion, int layers){
+    int frequency = 1; //How much detail
+    int amplitude = 1; //How sharp are the details
+    float total = 0;
+    float max_val = 0;
+    if (layers != 0){
+        for (int i = 0; i < layers; i++){
+            Vec3 scaled_position = {positiion.x * frequency, positiion.y * frequency, positiion.z * frequency};
+            float noise_level = noise(scaled_position) * amplitude;
+            //Scale down the sharpness of each layer
+            amplitude = amplitude * 0.5f;
+            frequency = frequency * 2.0f;
+            //Adding the values 
+            total = total + noise_level;
+            max_val = max_val + amplitude;
+        }
+    }
+    else{
+        return (noise(positiion)+1.0f)*0.5f;
+    }
+    return ((total/max_val)+1.0f)*0.5f;
+}
+
+
+float blendFactor(int32_t lattitude, int32_t min_fp, int32_t max_fp){
+    int32_t range = max_fp - min_fp;
+    if (range == 0) return 0; // Avoid division by zero
+    
+    int32_t pos = lattitude - min_fp;
+    int32_t t = div_fp(pos, range);
+    
+    // Clamp to 0-1 range
+    if (t < 0) return 0;
+    if (t > ONE) return ONE;
+    return t;
+}
+
+Vec3 getPlanetColor(Vec3 hit_point, Vec3 hit_normal){
+    int32_t lattitude = abs_fp(hit_normal.y);
+    int32_t terrain_noise_fp = F(layerdPerlin_noise(hit_point, COLOR_LAYERS));
+
+    //Terrian_boundries 
+    int32_t ice_start = F(0.9) + mul(terrain_noise_fp, F(0.1));
+    int32_t ice_end = F(0.8) + mul(terrain_noise_fp, F(0.1));
+    int32_t forest_start = F(0.8) + mul(terrain_noise_fp, F(0.1));
+    int32_t forest_end = F(0.4) + mul(terrain_noise_fp, F(0.1));
+    int32_t desert_start = F(0.4) + mul(terrain_noise_fp, F(0.1));
+    int32_t desert_end = F(0.0) + mul(terrain_noise_fp, F(0.1));
+
+    //Get color scaling facotr
+    int32_t ice_factor = F(blendFactor(lattitude,ice_end,ice_start)); //0.5 radius is above max size of planets 
+    int32_t forest_factor = F(blendFactor(lattitude, forest_end,forest_start));
+    int32_t desert_factor = F(blendFactor(lattitude,desert_end, desert_start)); //0 = smalled radius 
+
+    //Colors
+    Vec3 ice_color = convert_color((Vec3){245, 236, 213});
+    Vec3 forest_color = convert_color((Vec3){98, 111, 71});
+    Vec3 desert_color = convert_color((Vec3){240, 187, 120});
+
+    //Caculate colors
+    //F(value = percent of surface)
+    if (lattitude >= ice_end && lattitude < ice_start){
+        return vec_scale(ice_color, ice_factor);
+    }
+    else if (lattitude >= forest_end && lattitude < forest_start){
+        return vec_scale(forest_color, forest_factor);
+    }
+    else if (lattitude >= desert_end && lattitude < desert_start){
+        return vec_scale(desert_color, desert_factor);
+    }
+    else return desert_color; //you fucked up
+    }
+
 Color trace_path(int16_t x, int16_t y) {
     //#pragma HLS ALLOCATION function instances=mul limit=32
     //#pragma HLS ALLOCATION function instances=div_fp limit=8
@@ -450,12 +605,15 @@ Color trace_path(int16_t x, int16_t y) {
             int hit_object_index = inter.hit_index;
 
             Vec3 hit_point = vec_add(r.orig, vec_scale(r.dir, t));
-            Vec3 hit_normal;
+            Vec3 hit_normal; //surface normal
             Material mat;
 
-            if (inter.hit_type == 0) { // Sphere
+            if (inter.hit_type == 0 ) { // Sphere
                 mat = g_spheres[hit_object_index].material;
-                hit_normal = vec_norm(vec_sub(hit_point, g_spheres[hit_object_index].center));
+                hit_normal = vec_norm(vec_sub(hit_point, g_spheres[hit_object_index].center)); //surface normal
+                if (!mat.is_light) {
+                mat.color = getPlanetColor(hit_point,hit_normal);
+               }
             } else if (inter.hit_type == 1) { // Ring
                 mat = g_rings[hit_object_index].material;
                 hit_normal = g_rings[hit_object_index].normal;
