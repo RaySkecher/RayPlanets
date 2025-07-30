@@ -372,6 +372,50 @@ void setup_rings() {
     }
 }
 
+Vec3 spherical_to_cartesian(float radius, float theta, float phi) {
+    float x = radius * sinf(phi) * cosf(theta);
+    float y = radius * cosf(phi);
+    float z = radius * sinf(phi) * sinf(theta);
+    return (Vec3){ F(x), F(y), F(z) };
+}
+
+Vec3 get_camera_position_horizontal(Vec3 sun_center, float orbit_radius, float angle){
+    Vec3 offset = (Vec3){F(0), F(2), F(orbit_radius)};
+    Vec3 rotated_offset = rotate_y(offset, angle);
+    return vec_add(sun_center, rotated_offset);
+}
+
+Vec3 get_camera_position_vertical(Vec3 center, float radius, float theta, float phi) {
+    Vec3 offset = spherical_to_cartesian(radius, theta, phi);
+    return vec_add(center, offset);
+}
+
+void update_camera_orbit(float angle) {
+    Vec3 sun_pos = g_spheres[1].center;
+    Vec3 to_sun = vec_sub(sun_pos, camera.orig);
+    camera.dir = vec_norm(to_sun);
+}
+
+
+void update_camera_position(uint16_t scanCode, float timeStep){
+    Vec3 sun_pos = g_spheres[1].center;
+
+     // A key: rotate left
+    if (scanCode == 0xF01C) camera.theta -= timeStep;
+    // D key: rotate right
+    if (scanCode == 0xF023) camera.theta += timeStep;
+    // W key: rotate up
+    if(scanCode == 0xF01D) camera.phi += timeStep;
+    // S key: rotate down
+    if(scanCode == 0xF01B) camera.phi -= timeStep;
+
+
+    // Update camera position
+    if(scanCode == 0xF01C || scanCode == 0xF023) camera.orig = get_camera_position_horizontal(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta);
+    if(scanCode == 0xF01D || scanCode == 0xF01B) camera.orig = get_camera_position_vertical(sun_pos, CAMERA_ORBIT_RADIUS, camera.theta, camera.phi);
+    update_camera_orbit(camera.theta);
+}
+
 // Returns an Intersection result.
 Intersection intersect_scene(Ray r) {
     Intersection result = {.t = FP_INF, .hit = 0, .hit_index = -1, .hit_type = -1};
