@@ -823,3 +823,4 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Rendering complete!\n");
     return 0;
 } 
+
