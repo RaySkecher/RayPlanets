@@ -17,7 +17,7 @@
 // Animation settings
 #define ANIMATION_TIME 0.0f  // Current time (can be modified for different frames)
 #define PLANET1_ORBIT_RADIUS 2.5f
-#define PLANET1_ORBIT_SPEED 1.0f
+#define PLANET1_ORBIT_SPEED 1.2f
 #define PLANET2_ORBIT_RADIUS 1.6f  
 #define PLANET2_ORBIT_SPEED 0.6f
 #define CAMERA_ORBIT_RADIUS 4.0f
