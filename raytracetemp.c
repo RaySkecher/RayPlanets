@@ -468,8 +468,8 @@ Color trace_path(int16_t x, int16_t y) {
                 // deep_purple_blue: now approximates ~RGB(40, 20, 100)
                 // light_purple_blue: now approximates ~RGB(100, 80, 200)
                 //Both values adjusted for BRIGHTNESS_SHIFT
-                Vec3 deep_purple_blue = {F(0.0098), F(0.0049), F(0.0245)}; 
-                Vec3 light_purple_blue = {F(0.0245), F(0.0196), F(0.049)};
+                Vec3 deep_purple_blue = {F(0.078), F(0.137), F(0.294)}; 
+                Vec3 light_purple_blue = {F(0.059), F(0.098), F(0.196)};
 
                 // Get interpolation factor based on ray's Y-direction (vertical position)
                 // Map r.dir.y from [-ONE, ONE] to [0, ONE]
@@ -632,7 +632,7 @@ void render_frame(float animation_time, Color output_buffer[HEIGHT][WIDTH]) {
 }
 
 //COMMENT OUT main IF YOU'RE RUNNING THIS ON VITIS!
-
+/*
 int main(int argc, char *argv[]) {
     // Parse animation time from command line (default to 0.0)
     float animation_time = ANIMATION_TIME;
@@ -667,3 +667,4 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Rendering complete!\n");
     return 0;
 } 
+*/
